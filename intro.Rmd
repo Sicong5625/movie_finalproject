@@ -1,7 +1,7 @@
 ---
-title: "Untitled"
-author: "Sicong He"
-date: "2020/8/4"
+title: "Final-proj-proposal"
+author: "Sicong He & Ruiyang Dai"
+date: "2020/7/18"
 output: html_document
 ---
 
@@ -9,21 +9,61 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## introduction
+## A tentative title for the project.
+Exploration to the influences and relation of different variables to the IMBD score of movies
+
+## Description of the data file
+The dataset collected data of 28 variables from 5000 movies. 
+The dataset contains variables such as director name, budget, imdb scores, year of publication, and etc.
+
+The variables we are about to use in this project: 
+
+`Color`: ` Black and White` and `Color`, depends on the color of the movie
+
+`num_critic_for_reviews`: number of critics that have written review articles about the movie
+
+`duration`: total length of the movie
+
+`director_facebook_likes`: likes the director get from facebook about the movie on facebook
+
+`actor_1_facebook_likes`: number of likes the actor who play the leading role in the movie on facebook
+
+`gross`: the money earned from the movie, in dollars, globally.
+
+`movie_title`: title of the movie
+
+`num_voted_users`: number of users who vote for the movie on imdb website
+‘cast_total_facebook_likes: Total facebook likes for this movie.
+
+`num_user_for_reviews`: Number of users for reviews.
+
+`Language: Language`.
+
+`content_rating`: Level of content so parents may decide whether the movie is suitable for their children.
+
+`budget`: budget
+
+`title_year`: year of publication
+
+`imdb_score`: scores that given by IMDB
 
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+Source: https://www.kaggle.com/carolzhangdc/imdb-5000-movie-dataset
 
-```{r cars}
-summary(cars)
+## Background information
+
+IMDb (Internet Movie Database) is an online database of information related to films, television programs, home videos, video games, and streaming content online – including cast, production crew and personal biographies, plot summaries, trivia, ratings, and fan and critical reviews.
+
+## Statement of interest
+
+We are going to explore the potential relationships between all other variables like budget, year of publication, director, etc. and the IMDB score of the movie. Using imdb scores as the response, we expect to build a good model that could help us predict the potential imdb scores of the new releasing movies.
+
+## Evidence that the data can be loaded into `R`
+
+```{r fig.height=50, fig.width=5}
+library(readr)
+movie = read.csv("movie_metadata.csv")
+head(movie, 5)
+names(movie)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
