@@ -1,19 +1,25 @@
 ---
-title: "Final-proj-proposal"
+title: "Exploration to the influences and relation of different variables to the IMBD score of moviest"
 author: "Sicong He & Ruiyang Dai"
-date: "2020/7/18"
-output: html_document
+date: "2020/8/2"
+output:
+  html_document: 
+    theme: readable
+    toc: yes
+  pdf_document: default
+urlcolor: cyan
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## A tentative title for the project.
-Exploration to the influences and relation of different variables to the IMBD score of movies
 
-## Description of the data file
-The dataset collected data of 28 variables from 5000 movies. 
+# Introduction
+Both members in our team has a strong interest in movies, thus we decided to look for a dataset about movies as our final project. After a extensive search, we choose this dataset with IMDB scores of 5000 movies. In this project, we are going to explore the potential relationships between all other variables like budget, year of publication, director, etc. and the IMDB score of the movie. Using IMDB scores as the response, we expect to build a good model that could help us predict the potential imdb scores of the new releasing movies.  
+  
+The information of the data, and the variables we want to use are listed below:  
+The dataset collected data of 28 variables from 5000 movies.   
 The dataset contains variables such as director name, budget, imdb scores, year of publication, and etc.
 
 The variables we are about to use in this project: 
@@ -30,16 +36,14 @@ The variables we are about to use in this project:
 
 `gross`: the money earned from the movie, in dollars, globally.
 
-`movie_title`: title of the movie
-
 `num_voted_users`: number of users who vote for the movie on imdb website
 ‘cast_total_facebook_likes: Total facebook likes for this movie.
 
 `num_user_for_reviews`: Number of users for reviews.
 
-`Language: Language`.
+`Language`: English and other.
 
-`content_rating`: Level of content so parents may decide whether the movie is suitable for their children.
+`content_rating`: Level of content so parents may decide whether the movie is suitable for their children, PG, PG-13, R, and others.
 
 `budget`: budget
 
@@ -50,20 +54,243 @@ The variables we are about to use in this project:
 
 Source: https://www.kaggle.com/carolzhangdc/imdb-5000-movie-dataset
 
-## Background information
-
-IMDb (Internet Movie Database) is an online database of information related to films, television programs, home videos, video games, and streaming content online – including cast, production crew and personal biographies, plot summaries, trivia, ratings, and fan and critical reviews.
-
-## Statement of interest
-
-We are going to explore the potential relationships between all other variables like budget, year of publication, director, etc. and the IMDB score of the movie. Using imdb scores as the response, we expect to build a good model that could help us predict the potential imdb scores of the new releasing movies.
-
-## Evidence that the data can be loaded into `R`
-
-```{r fig.height=50, fig.width=5}
+# Methods
+```{r message=FALSE, warning=FALSE}
 library(readr)
-movie = read.csv("movie_metadata.csv")
-head(movie, 5)
-names(movie)
+library(forcats)
+library(faraway)
+library(lmtest)
 ```
+
+```{r}
+movie = read.csv("movie_metadata.csv")
+movie = movie[,c("color", "num_critic_for_reviews", "duration", "director_facebook_likes", "actor_1_facebook_likes", "gross", "num_voted_users", "num_user_for_reviews", "language", "content_rating", "budget", "title_year", "imdb_score")]
+movie$language = fct_other(movie$language, keep = "English", other_level = "Other") #simplify movie languages into only 2 factors
+movie$content_rating = fct_other(movie$content_rating, keep = c("R", "PG-13", "PG"), other_level = "Other") #simplify content ratings into only 4 factors. 
+movie = movie[complete.cases(movie), ] #delete observations with NA
+train = sample(1:3886, 800)
+is.factor(movie$color)
+movie$color = as.factor(movie$color)
+is.factor(movie$language)
+movie$language = as.factor(movie$language)
+is.factor(movie$content_rating)
+movie$content_rating = as.factor(movie$content_rating)
+is.factor(movie$content_rating)
+train_data = movie[train,]
+n = 800
+test_data = movie[-train,]
+```
+```{r, fig.height=20, fig.width=20, eval=FALSE}
+plot(movie, col = "dodgerblue")
+```
+Therer seems to be relationships existing between IMDB scores with all the variables, and we observed a stong colinearity between duration and number of reviews, and there seems to exist some relationship between gross~all other numeric factors
+## Model selection by AIC and BIC
+
+Firstly, we decided to use a BIC model to begin our variable selection, using stepwise search checks going both backwards and forwards at every step. Then, we set the full interactive model as an end point. 
+
+```{r}
+full_add_model = lm(imdb_score ~ ., data = train_data)
+BIC_model  = step(full_add_model, scope = imdb_score ~ .^2, direction = "both", k = log(n), trace = 0)
+```
+
+Here are result of the BIC model:
+```{r}
+coef(BIC_model)
+
+```
+
+## Model Diagnostics -- Check constant variance assumption
+
+We create functions that could help us check constant variance assumption
+```{r}
+# A test for constant variance
+const_var_test = function(model) {
+  p = bptest(model)$p.value[[1]]
+  print(c("p-value is", signif(p, 3)))
+  ifelse(p > 0.05, "Do not reject H0, The errors have constant variance about the true model."
+         , "Reject H0, The errors have non-constant variance about the true model.")
+}
+# A function that can help to draw a residual plot
+resid_plot = function(model) {
+  plot(fitted(model), resid(model))
+  abline(h = 0)
+}
+```
+
+
+
+
+Apply test functions to  BIC model
+
+```{r}
+const_var_test(BIC_model)
+resid_plot(BIC_model)
+```
+
+## Model Diagnostics -- Check normality assumption
+
+We create functions that could help us check normality assumption
+```{r}
+# A test for Normality
+normality_test = function(model) {
+  p = shapiro.test(resid(model))$p.value
+  print(c("p-value is", signif(p, 3)))
+  ifelse(p > 0.05, "Do not reject H0, We assume the data were sampled from a normal distribution."
+         , "Reject H0, We do not assume the data were sampled from a normal distribution.")
+}
+# A function that can help to draw a normal Q-Q plot
+qq_plot = function(model) {
+  qqnorm(resid(model))
+  qqline(resid(model), col = "dodgerblue", lwd = 2)
+}
+```
+
+Apply these functions on our  BIC model
+
+```{r}
+normality_test(BIC_model)
+qq_plot(BIC_model)
+shapiro.test(resid(BIC_model))
+```
+We observed an obvious pattern in Q-Q plot that the data does not follows a normal distribution and a fat tailat the left. Thus we decided to try a data transformation.
+```{r}
+model_BIC = lm(imdb_score~color + num_critic_for_reviews + duration + gross + num_voted_users + language + content_rating + budget 
+   + title_year + duration:num_voted_users + duration:content_rating + num_critic_for_reviews:content_rating + language:budget, data = train_data)
+```
+we first tried a log transformation:  
+
+```{r}
+log_imdb = lm(imdb_score ~ color + num_critic_for_reviews + duration + gross + num_voted_users + language + content_rating + budget 
+   + title_year+ duration:num_voted_users + duration:content_rating + num_critic_for_reviews:content_rating + language:budget + log(num_critic_for_reviews) + log(duration) + log(num_user_for_reviews) + log(budget) + log(title_year) + log(gross) + log(num_voted_users) , data = train_data)
+back_BIC = step(log_imdb, trace = 0, k = log(n))
+coef(back_BIC)
+```
+
+and selected the log variables BIC test remains to perform a model:  
+```{r}
+log_movie2 = lm(imdb_score ~ color +duration +gross +  log(num_critic_for_reviews) +  log(num_user_for_reviews) +content_rating+
+                  language + log(budget) + log(num_voted_users) +log(num_voted_users) +  duration:num_voted_users + duration:content_rating
+                +num_critic_for_reviews:content_rating + language:budget, data = train_data)
+```
+```{r}
+normality_test(log_movie2)
+const_var_test(log_movie2)
+```
+
+
+```{r}
+qq_plot(log_movie2)
+```
+we see no obvious improvement in the normailty and equal variance assumptions.  
+
+Then, we decided to try $1/x$:  
+we first perform it on the response:
+```{r}
+fraction_movie = lm(1/(imdb_score)~color + num_critic_for_reviews + duration + gross + num_voted_users + language + content_rating + budget 
+   + title_year + duration:num_voted_users + duration:content_rating + num_critic_for_reviews:content_rating + language:budget, data = train_data)
+```
+
+```{r}
+normality_test(fraction_movie)
+const_var_test(fraction_movie)
+summary(fraction_movie)$adj.r.squared
+```
+```{r}
+qq_plot(fraction_movie)
+resid_plot(fraction_movie)
+```
+
+we observed that using a fraction method does improve the assumption of model significantly. With the qqplot plot we observed an obvious "fat tail" on the right.  
+To deal with the tail, we first analyze our trained dataset to remove the unusual observations:   
+first we check for observations that are influrential:  
+```{r}
+outliers=subset(train_data, cooks.distance(fraction_movie) > 4/length(cooks.distance(fraction_movie)))
+newdata = subset(train_data, cooks.distance(fraction_movie) <= 4/length(cooks.distance(fraction_movie)))
+outliers
+```
+after removing the influential outliers, we fit the new data into our model again:  
+```{r}
+fraction_movie_new = lm(1/(imdb_score)~color + num_critic_for_reviews + duration + gross + num_voted_users + language + content_rating + budget 
+   + title_year + duration:num_voted_users + duration:content_rating + num_critic_for_reviews:content_rating + language:budget, data = newdata)
+```
+and perform test to check its assumptions for normality and equal varia:  
+```{r}
+normality_test(fraction_movie_new)
+const_var_test(fraction_movie_new)
+```
+```{r, fig.height=8, fig.width=10}
+par(mfrow = c(1,2))
+qq_plot(fraction_movie_new)
+resid_plot(fraction_movie_new)
+```
+We can still observed the cluster in our residual plot, thus we decided to try to transform our data, to improve the performance.  
+
+We first tried to square the response, but does not see significant improvement
+```{r}
+fraction_movie_new1 = lm(I(1/(imdb_score)^2)~color + num_critic_for_reviews + duration + gross + num_voted_users + language + content_rating + budget 
+   + title_year + duration:num_voted_users + duration:content_rating + num_critic_for_reviews:content_rating + language:budget, data = newdata)
+```
+```{r}
+normality_test(fraction_movie_new1)
+const_var_test(fraction_movie)
+```
+```{r}
+par(mfrow = c(1,2))
+qq_plot(fraction_movie)
+resid_plot(fraction_movie)
+```
+no obvious improvement for the model.  
+Then we try log transformation to our response:  
+```{r}
+fraction_movie_log = lm(log(1/(imdb_score))~color + num_critic_for_reviews + duration + gross + num_voted_users + language + content_rating + budget 
+   + title_year + duration:num_voted_users + duration:content_rating + num_critic_for_reviews:content_rating + language:budget, data = newdata)
+```
+```{r}
+normality_test(fraction_movie_log)
+const_var_test(fraction_movie_log)
+```
+```{r, fig.height=8, fig.width=10}
+par(mfrow = c(1,2))
+qq_plot(fraction_movie_log)
+resid_plot(fraction_movie_log)
+```
+we do not see improve in performance for any of the assumptions.  
+then, we try the backward and stepwise BIC method for our fraction model to see if we can eliminate some factors:  
+```{r}
+new_n  = 771
+frac_back_BIC = step(fraction_movie_new, trace = 0, k = log(new_n))
+frac_step_BIC = step(fraction_movie_new, scope = imdb_score ~ .^2, direction = "both", k=log(new_n), trace = 0)
+```
+```{r}
+length(coef(frac_back_BIC)) > length(coef(frac_step_BIC))
+```
+
+```{r}
+summary(frac_back_BIC)$adj.r.squared
+summary(frac_step_BIC)$adj.r.squared
+```
+We choose the model with backward BIC.
+
+```{r}
+normality_test(frac_back_BIC)
+const_var_test(frac_back_BIC)
+```
+```{r, fig.height=8, fig.width=10}
+par(mfrow = c(1,2))
+qq_plot(frac_back_BIC)
+resid_plot(frac_back_BIC)
+```
+
+```{r}
+plot(frac_back_BIC)
+```
+
+from the plot above we can see that the data marked 
+```{r}
+rm = which(rownames(newdata) == "1565")
+names(frac_back_BIC)
+plot(newdata[-515,])
+```
+
+
 
